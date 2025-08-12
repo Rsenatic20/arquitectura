@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación SENATIC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        /* Estilos personalizados que Tailwind no maneja fácilmente */
+        .header-field textarea {
+            resize: vertical;
+            min-height: 38px;
+            overflow: hidden;
+        }
+
+        .border-red-500 {
+            border-color: #ef4444 !important;
+        }
+
+        .numeric-matching-input {
+            text-align: center;
+            background-color: #e6f7ff;
+            border: 1px solid #b3e0ff;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .numeric-matching-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+        }
+
+        .question-block {
+            background-color: #fff3e0;
+        }
+
+        .student-name-field {
+            background-color: #e6f7ff;
+        }
+
+        .feedback.correct {
+            color: #10b981;
+        }
+
+        .feedback.incorrect {
+            color: #ef4444;
+        }
+        
+        /* Nuevos estilos para el textarea de definición */
+        .definition-textarea {
+            min-height: 100px;
+            resize: vertical;
+            background-color: #fefcbf; /* Fondo amarillo */
+            transition: all 0.3s ease;
+        }
+
+        /* Estilos para el nuevo drag-and-drop */
+        .drag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            padding: 1rem;
+            background-color: #f0f9ff;
+            border-radius: 0.5rem;
+            border: 1px dashed #93c5fd;
+            min-height: 80px;
+        }
+
+        .draggable {
+            cursor: grab;
+            padding: 0.75rem 1.25rem;
+            background-color: #1d4ed8;
+            color: white;
+            font-weight: 500;
+            border-radius: 9999px; /* rounded-full */
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            touch-action: none;
+        }
+        
+        .draggable:hover {
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        .dropzone {
+            flex: 1;
+            padding: 1rem;
+            background-color: #f9fafb;
+            border: 2px dashed #d1d5db;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .dropzone.drag-over {
+            background-color: #e2e8f0;
+            border-color: #3b82f6;
+        }
+
+        .dropzone-occupied {
+            background-color: #d1fae5;
+            border-color: #10b981;
+        }
+
+        /* Custom scrollbar for better UX */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+    <!-- Message Modal -->
+    <div id="messageModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 id="messageTitle" class="text-xl font-bold mb-4 text-blue-800"></h3>
+            <p id="messageText" class="mb-6"></p>
+            <div class="flex justify-center">
+                <button id="closeMessage" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200">
+                    Aceptar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 z-40 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <p class="text-lg font-medium">Procesando evaluación...</p>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-blue-900 mb-2">EVALUACIÓN</h1>
+            <h2 class="text-2xl font-semibold text-blue-800 mb-1">PROGRAMA SENATIC</h2>
+            <h3 class="text-xl font-medium text-blue-700">TÉCNICO SISTEMAS TELEINFORMÁTICOS</h3>
+        </div>
+
+        <!-- Header Fields -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Competencia -->
+                <div class="header-field">
+                    <label for="competencia" class="block text-sm font-medium text-gray-700 mb-1">COMPETENCIA:</label>
+                    <select id="competencia" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+                        <option value="">Seleccione una opción</option>
+                        <option value="MANTENIMIENTO DE LOS EQUIPOS DE CÓMPUTO">MANTENIMIENTO DE LOS EQUIPOS DE CÓMPUTO</option>
+                        <option value="OPERACIÓN DE HERRAMIENTAS INFORMÁTICAS">OPERACIÓN DE HERRAMIENTAS INFORMÁTICAS</option>
+                        <option value="VERIFICACIÓN DEL FUNCIONAMIENTO DE LA RED DE DATOS">VERIFICACIÓN DEL FUNCIONAMIENTO DE LA RED DE DATOS</option>
+                    </select>
+                </div>
+
+                <!-- RAP -->
+                <div class="header-field">
+                    <label for="rap" class="block text-sm font-medium text-gray-700 mb-1">RAP:</label>
+                    <textarea id="rap" required rows="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border"></textarea>
+                </div>
+
+                <!-- Tema a Evaluar -->
+                <div class="header-field">
+                    <label for="temaEvaluar" class="block text-sm font-medium text-gray-700 mb-1">TEMA A EVALUAR:</label>
+                    <textarea id="temaEvaluar" required rows="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border"></textarea>
+                </div>
+
+                <!-- Tipo de Instrumento -->
+                <div class="header-field">
+                    <label for="tipoInstrumento" class="block text-sm font-medium text-gray-700 mb-1">TIPO DE INSTRUMENTO:</label>
+                    <select id="tipoInstrumento" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+                        <option value="">Seleccione una opción</option>
+                        <option value="CONOCIMIENTO">CONOCIMIENTO</option>
+                        <option value="DESEMPEÑO">DESEMPEÑO</option>
+                        <option value="PRODUCTO">PRODUCTO</option>
+                    </select>
+                </div>
+
+                <!-- Ficha -->
+                <div class="header-field">
+                    <label for="ficha" class="block text-sm font-medium text-gray-700 mb-1">FICHA:</label>
+                    <select id="ficha" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+                        <option value="">Seleccione una opción</option>
+                        <option value="3010320">3010320</option>
+                        <option value="3010341">3010341</option>
+                        <option value="3002298">3002298</option>
+                    </select>
+                </div>
+
+                <!-- Fecha -->
+                <div class="header-field">
+                    <label for="fecha" class="block text-sm font-medium text-gray-700 mb-1">FECHA:</label>
+                    <input type="date" id="fecha" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+                </div>
+
+                <!-- Nombre del Aprendiz -->
+                <div class="header-field">
+                    <label for="nombreAprendiz" class="block text-sm font-medium text-gray-700 mb-1">NOMBRE DEL APRENDIZ:</label>
+                    <input type="text" id="nombreAprendiz" required autocomplete="off" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border student-name-field">
+                </div>
+
+                <!-- Nombre del Instructor -->
+                <div class="header-field">
+                    <label for="nombreInstructor" class="block text-sm font-medium text-gray-700 mb-1">NOMBRE DEL INSTRUCTOR:</label>
+                    <input type="text" id="nombreInstructor" value="RAFAEL MONTES MARTINEZ" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border">
+                </div>
+            </div>
+        </div>
+
+        <!-- Evaluation Form -->
+        <form id="evaluationForm" class="bg-white rounded-xl shadow-md p-6">
+            <div id="questions-container" class="space-y-6">
+                <!-- Questions will be rendered here by JavaScript -->
+            </div>
+
+            <!-- Score Container -->
+            <div id="scoreContainer" class="mt-8 text-center hidden">
+                <h3 class="text-2xl font-bold text-blue-800">
+                    Puntaje Total: <span id="finalScore" class="text-blue-600">0</span> / <span id="totalQuestions" class="text-blue-600">0</span>
+                </h3>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-8 flex flex-col sm:flex-row justify-center gap-4">
+                <button type="button" id="evaluateBtn" disabled class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    EVALUAR RESPUESTAS
+                </button>
+                <button type="button" id="secondAttemptBtn" disabled class="bg-yellow-500 hover:bg-yellow-600 text-gray-800 font-medium py-3 px-6 rounded-lg transition duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    SEGUNDO INTENTO
+                </button>
+                <button type="button" id="downloadPdfBtn" disabled class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    DESCARGAR PDF
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const questionsContainer = document.getElementById('questions-container');
+            const evaluateBtn = document.getElementById('evaluateBtn');
+            const secondAttemptBtn = document.getElementById('secondAttemptBtn');
+            const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+            const scoreContainer = document.getElementById('scoreContainer');
+            const finalScoreSpan = document.getElementById('finalScore');
+            const totalQuestionsSpan = document.getElementById('totalQuestions');
+            const messageModal = document.getElementById('messageModal');
+            const messageTitle = document.getElementById('messageTitle');
+            const messageText = document.getElementById('messageText');
+            const closeMessageBtn = document.getElementById('closeMessage');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const fechaInput = document.getElementById('fecha');
+
+            // Set today's date as default
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            fechaInput.value = `${year}-${month}-${day}`;
+
+            // Questions Data - Questions 9-12 have been removed as requested.
+            const questions = [
+                {
+                    "id": 1,
+                    "type": "Definición y Opción Múltiple",
+                    "question": "Explica en tus propias palabras qué es el 'mantenimiento de computadores' y, basándote en el texto, selecciona la opción que mejor describe la definición correcta.",
+                    "options": [
+                        "Es un conjunto de prácticas y acciones fundamentales para asegurar el óptimo funcionamiento, prolongar la vida útil y mantener la seguridad de los equipos informáticos. No se trata solo de reparar problemas cuando surgen, sino de prevenirlos activamente y optimizar el rendimiento del sistema a lo largo del tiempo. Es una inversión que minimiza riesgos y costos futuros.",
+                        "Se enfoca exclusivamente en la reparación de fallas de hardware cuando estos ya han ocurrido, sin considerar la prevención o el software.",
+                        "Consiste únicamente en realizar actualizaciones de software y parches de seguridad para evitar virus, sin prestar atención a la limpieza física del equipo."
+                    ],
+                    "correctAnswer": "Es un conjunto de prácticas y acciones fundamentales para asegurar el óptimo funcionamiento, prolongar la vida útil y mantener la seguridad de los equipos informáticos. No se trata solo de reparar problemas cuando surgen, sino de prevenirlos activamente y optimizar el rendimiento del sistema a lo largo del tiempo. Es una inversión que minimiza riesgos y costos futuros."
+                },
+                {
+                    "id": 2,
+                    "type": "Definición y Opción Múltiple",
+                    "question": "Selecciona la definición correcta de 'Mantenimiento'.",
+                    "options": [
+                        "Es el proceso de reparar los componentes físicos de una computadora cuando dejan de funcionar, sin incluir el software ni la prevención.",
+                        "Se define como el conjunto de procedimientos y acciones técnicas realizadas periódicamente sobre un sistema de cómputo (hardware y software) con el objetivo de prevenir fallas, corregir errores, y mejorar el rendimiento y la estabilidad del equipo. Su propósito es garantizar la operatividad continua y eficiente, minimizando riesgos y costos asociados a interrupciones o daños mayores.",
+                        "Es la acción de esperar a que un equipo falle para luego aplicar soluciones correctivas, enfocándose únicamente en la reparación de daños."
+                    ],
+                    "correctAnswer": "Se define como el conjunto de procedimientos y acciones técnicas realizadas periódicamente sobre un sistema de cómputo (hardware y software) con el objetivo de prevenir fallas, corregir errores, y mejorar el rendimiento y la estabilidad del equipo. Su propósito es garantizar la operatividad continua y eficiente, minimizando riesgos y costos asociados a interrupciones o daños mayores."
+                },
+                {
+                    "id": 3,
+                    "type": "Opción Múltiple (múltiples respuestas)",
+                    "question": "¿Cuáles de los siguientes son tipos de mantenimiento? (Selecciona 4 opciones obligatorias).",
+                    "options": [
+                        "Mantenimiento Preventivo",
+                        "Mantenimiento por Demanda",
+                        "Mantenimiento Correctivo",
+                        "Mantenimiento Estructural",
+                        "Mantenimiento Predictivo",
+                        "Mantenimiento Evolutivo"
+                    ],
+                    "correctAnswers": [
+                        "Mantenimiento Preventivo",
+                        "Mantenimiento Correctivo",
+                        "Mantenimiento Predictivo",
+                        "Mantenimiento Evolutivo"
+                    ]
+                },
+                {
+                    "id": 4,
+                    "type": "Arrastrar y Soltar",
+                    "question": "Arrastra cada tipo de mantenimiento a la descripción que le corresponde.",
+                    "draggableItems": [
+                        "Mantenimiento Predictivo",
+                        "Mantenimiento Correctivo",
+                        "Mantenimiento Evolutivo/Adaptativo",
+                        "Mantenimiento Preventivo"
+                    ],
+                    "dropzones": {
+                        "Acciones tomadas de forma regular y planificada para prevenir futuros problemas, extender la vida útil del equipo y mantener su rendimiento óptimo antes de que ocurran fallas.": "Mantenimiento Preventivo",
+                        "Acciones realizadas para reparar o solucionar un problema que ya ha ocurrido, restaurando el sistema a su estado operativo normal lo más rápido posible.": "Mantenimiento Correctivo",
+                        "Utiliza herramientas y técnicas de monitoreo para analizar el estado de los componentes del computador y predecir cuándo podría ocurrir una falla, permitiendo tomar medidas antes de que suceda.": "Mantenimiento Predictivo",
+                        "Modificaciones y actualizaciones al hardware o software de un computador para adaptarlo a nuevas necesidades, tecnologías o entornos, mejorando su funcionalidad o compatibilidad.": "Mantenimiento Evolutivo/Adaptativo"
+                    }
+                },
+                {
+                    "id": 5,
+                    "type": "Arrastrar y Soltar",
+                    "question": "ACCIONES QUE SE DEBEN REALIZAR SEGUN EL TIPO DE MANTENIMIENTO.",
+                    "draggableItems": [
+                        "Mantenimiento Correctivo",
+                        "Mantenimiento Evolutivo",
+                        "Mantenimiento Preventivo",
+                        "Mantenimiento Predictivo"
+                    ],
+                    "dropzones": {
+                        "Ejemplos: Limpieza interna y externa de componentes (polvo, ventiladores). Actualización de sistema operativo, drivers y aplicaciones. Desfragmentación de discos duros (si aplica, no SSDs). Escaneo y eliminación de virus/malware. Verificación de conexiones de cables y componentes. Realización de copias de seguridad (backups) de forma periódica.": "Mantenimiento Preventivo",
+                        "Ejemplos: Reemplazo de un componente de hardware defectuoso (ej., disco duro, RAM, fuente de poder). Eliminación de virus o malware avanzado que afecta el sistema. Reparación de errores lógicos en el disco duro o en el sistema de archivos. Reinstalación del sistema operativo debido a corrupción grave. Solución de problemas de software (ej., conflictos, errores de aplicación). Reparación de una pantalla rota o teclado dañado.": "Mantenimiento Correctivo",
+                        "Ejemplos: Monitoreo de la salud de discos duros (tecnología S.M.A.R.T.). Análisis de la temperatura de la CPU y GPU para detectar sobrecalentamiento. Seguimiento del uso de recursos (CPU, RAM, disco) para identificar tendencias anómalas. Evaluación de los niveles de ruido de ventiladores para detectar desgaste. Análisis de logs del sistema para identificar patrones de errores recurrentes.": "Mantenimiento Predictivo",
+                        "Ejemplos: Actualización a una versión más reciente del sistema operativo (ej., Windows 10 a Windows 11). Ampliación de la memoria RAM o reemplazo por módulos de mayor capacidad. Cambio de un disco duro HDD por un SSD para mejorar la velocidad. Actualización de la tarjeta gráfica para soportar nuevos juegos o aplicaciones exigentes. Instalación de nuevo hardware (ej., tarjeta de sonido, adaptador Wi-Fi) para añadir funcionalidades. Instalación de software específico para nuevas tareas o compatibilidad.": "Mantenimiento Evolutivo"
+                    }
+                },
+                {
+                    "id": 6,
+                    "type": "Opción Múltiple (única respuesta)",
+                    "question": "UTILIDAD O BENEFICIO DEL MANTENIMIENTO CORRECTIVO:",
+                    "options": [
+                        "Restaura la funcionalidad del equipo de manera inmediata o en el menor tiempo posible. Resuelve problemas críticos que impiden el uso normal del computador. Es esencial para recuperar la operatividad tras una falla.",
+                        "Permite detectar fallas futuras mediante el monitoreo constante de los componentes para tomar acciones preventivas.",
+                        "Se enfoca en mejorar las funcionalidades del equipo, como la actualización de software o la instalación de nuevo hardware."
+                    ],
+                    "correctAnswer": "Restaura la funcionalidad del equipo de manera inmediata o en el menor tiempo posible. Resuelve problemas críticos que impiden el uso normal del computador. Es esencial para recuperar la operatividad tras una falla."
+                },
+                {
+                    "id": 7,
+                    "type": "Opción Múltiple (múltiples respuestas)",
+                    "question": "Escoge las 6 Utilidades Generales del Mantenimiento.",
+                    "options": [
+                        "Prolongación de la Vida Útil",
+                        "Mejora del Rendimiento",
+                        "Seguridad Aumentada",
+                        "Prevención de Pérdida de Datos",
+                        "Reducción de Costos",
+                        "Mayor Estabilidad",
+                        "Aumento del Ruido del Sistema",
+                        "Incremento del Consumo Energético"
+                    ],
+                    "correctAnswers": [
+                        "Prolongación de la Vida Útil",
+                        "Mejora del Rendimiento",
+                        "Seguridad Aumentada",
+                        "Prevención de Pérdida de Datos",
+                        "Reducción de Costos",
+                        "Mayor Estabilidad"
+                    ]
+                },
+                {
+                    "id": 8,
+                    "type": "Completar",
+                    "question": "El cambio de un disco duro HDD por uno ____________ puede mejorar la velocidad.",
+                    "correctAnswer": "SSD"
+                }
+            ];
+
+            // State variables
+            let attemptCount = 0;
+            let score = 0;
+
+            // Helper Functions
+            function showMessage(title, message) {
+                messageTitle.textContent = title;
+                messageText.textContent = message;
+                messageModal.classList.remove('hidden');
+            }
+
+            function showLoading(show) {
+                if (show) {
+                    loadingOverlay.classList.remove('hidden');
+                } else {
+                    loadingOverlay.classList.add('hidden');
+                }
+            }
+
+            // Event Listeners
+            closeMessageBtn.addEventListener('click', () => {
+                messageModal.classList.add('hidden');
+            });
+
+            // Auto-resize for the RAP and Tema a Evaluar textareas
+            const rapTextarea = document.getElementById('rap');
+            const temaEvaluarTextarea = document.getElementById('temaEvaluar');
+            rapTextarea.addEventListener('input', autoResizeTextarea);
+            temaEvaluarTextarea.addEventListener('input', autoResizeTextarea);
+
+            function autoResizeTextarea(event) {
+                const element = event.target;
+                element.style.height = 'auto';
+                element.style.height = (element.scrollHeight) + 'px';
+            }
+
+            // Validación en tiempo real para campos obligatorios del encabezado
+            const headerFields = document.querySelectorAll('.header-field input, .header-field select, .header-field textarea');
+            headerFields.forEach(field => {
+                field.addEventListener('input', () => {
+                    if (field.value.trim() !== '') {
+                        field.classList.remove('border-red-500');
+                    }
+                    checkFormValidity();
+                });
+                
+                // Para campos que deben ser en mayúsculas
+                if (field.id === 'rap' || field.id === 'nombreAprendiz' || field.id === 'nombreInstructor' || field.id === 'temaEvaluar') {
+                    field.addEventListener('input', (event) => {
+                        event.target.value = event.target.value.toUpperCase();
+                    });
+                }
+            });
+
+            // Check if all header fields are filled
+            function checkFormValidity() {
+                let allFilled = true;
+                headerFields.forEach(field => {
+                    if (!field.value.trim()) {
+                        allFilled = false;
+                    }
+                });
+                evaluateBtn.disabled = !allFilled;
+            }
+
+            // Render Questions
+            function renderQuestions() {
+                questionsContainer.innerHTML = '';
+                questions.forEach(q => {
+                    const questionBlock = document.createElement('div');
+                    questionBlock.className = 'question-block p-4 rounded-lg border border-gray-200';
+                    questionBlock.setAttribute('data-question-id', q.id);
+
+                    // Question Type
+                    const questionType = document.createElement('p');
+                    questionType.className = 'text-sm italic text-gray-600 text-right mb-1';
+                    questionType.textContent = `(${q.type})`;
+                    questionBlock.appendChild(questionType);
+
+                    // Question Text
+                    const questionText = document.createElement('p');
+                    questionText.className = 'font-medium text-gray-800 mb-4';
+                    let questionHtml = `${q.id}. ${q.question}`;
+                    if (q.type === 'Verdadero o Falso' || q.type.includes('Opción Múltiple (única respuesta)')) {
+                        questionHtml += ' <span class="text-red-500">*</span>';
+                    }
+                    questionText.innerHTML = questionHtml;
+                    questionBlock.appendChild(questionText);
+
+                    // Question Content based on type
+                    if (q.type === 'Opción Múltiple (única respuesta)' || q.type === 'Verdadero o Falso') {
+                        const optionsDiv = document.createElement('div');
+                        optionsDiv.className = 'space-y-2';
+                        q.options.forEach(option => {
+                            const label = document.createElement('label');
+                            label.className = 'flex items-center space-x-2 cursor-pointer';
+
+                            const input = document.createElement('input');
+                            input.type = 'radio';
+                            input.name = `question-${q.id}`;
+                            input.value = option;
+                            input.className = 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300';
+                            input.required = true; // All radio buttons in a group are required
+
+                            label.appendChild(input);
+                            label.appendChild(document.createTextNode(option));
+                            optionsDiv.appendChild(label);
+                        });
+                        questionBlock.appendChild(optionsDiv);
+                    } else if (q.type === 'Opción Múltiple (múltiples respuestas)') {
+                        const optionsDiv = document.createElement('div');
+                        optionsDiv.className = 'space-y-2';
+                        q.options.forEach(option => {
+                            const label = document.createElement('label');
+                            label.className = 'flex items-center space-x-2 cursor-pointer';
+
+                            const input = document.createElement('input');
+                            input.type = 'checkbox';
+                            input.name = `question-${q.id}`;
+                            input.value = option;
+                            input.className = 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300';
+
+                            label.appendChild(input);
+                            label.appendChild(document.createTextNode(option));
+                            optionsDiv.appendChild(label);
+                        });
+                        questionBlock.appendChild(optionsDiv);
+                    } else if (q.type === 'Arrastrar y Soltar') {
+                        const dragContainer = document.createElement('div');
+                        dragContainer.className = 'drag-container mb-6';
+                        q.draggableItems.forEach((item, index) => {
+                            const draggableItem = document.createElement('div');
+                            draggableItem.className = 'draggable';
+                            draggableItem.id = `draggable-q${q.id}-item${index}`;
+                            draggableItem.setAttribute('draggable', 'true');
+                            draggableItem.textContent = item;
+                            draggableItem.addEventListener('dragstart', dragStart);
+                            dragContainer.appendChild(draggableItem);
+                        });
+                        questionBlock.appendChild(dragContainer);
+
+                        const dropzonesContainer = document.createElement('div');
+                        dropzonesContainer.className = 'space-y-4';
+                        Object.keys(q.dropzones).forEach((definition, index) => {
+                            const dropzoneWrapper = document.createElement('div');
+                            dropzoneWrapper.className = 'flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-lg bg-gray-50';
+
+                            const definitionText = document.createElement('p');
+                            definitionText.className = 'flex-1 text-gray-700 font-medium';
+                            definitionText.textContent = definition;
+                            dropzoneWrapper.appendChild(definitionText);
+
+                            const dropzone = document.createElement('div');
+                            dropzone.className = 'dropzone w-full sm:w-1/2 min-h-[60px] p-2';
+                            dropzone.id = `dropzone-q${q.id}-item${index}`;
+                            dropzone.setAttribute('data-correct-answer', q.dropzones[definition]);
+                            dropzone.addEventListener('dragover', dragOver);
+                            dropzone.addEventListener('drop', drop);
+                            dropzone.addEventListener('dragleave', dragLeave);
+                            dropzone.addEventListener('dragenter', dragEnter);
+                            dropzoneWrapper.appendChild(dropzone);
+
+                            dropzonesContainer.appendChild(dropzoneWrapper);
+                        });
+                        questionBlock.appendChild(dropzonesContainer);
+                    } else if (q.type === 'Completar') {
+                        const inputDiv = document.createElement('div');
+                        inputDiv.className = 'mt-4';
+                        
+                        const label = document.createElement('label');
+                        label.htmlFor = `question-${q.id}-fill`;
+                        label.className = 'block text-sm font-medium text-gray-700 mb-1';
+                        label.textContent = 'Completa la frase:';
+                        inputDiv.appendChild(label);
+                        
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.id = `question-${q.id}-fill`;
+                        input.className = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border';
+                        input.placeholder = 'Escribe tu respuesta aquí...';
+                        input.required = true;
+                        input.addEventListener('input', (event) => {
+                            event.target.value = event.target.value.toUpperCase();
+                            if (event.target.value.trim() !== '') {
+                                event.target.classList.remove('border-red-500');
+                            }
+                        });
+                        inputDiv.appendChild(input);
+                        
+                        questionBlock.appendChild(inputDiv);
+                    } else if (q.type === 'Definición y Opción Múltiple') {
+                        // Definition textarea
+                        const definitionLabel = document.createElement('label');
+                        definitionLabel.className = 'block text-sm font-medium text-gray-700 mb-1';
+                        definitionLabel.textContent = 'Escribe tu respuesta aquí:';
+                        questionBlock.appendChild(definitionLabel);
+
+                        const textarea = document.createElement('textarea');
+                        textarea.id = `question-${q.id}-definition`;
+                        textarea.className = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border definition-textarea';
+                        textarea.placeholder = 'Escribe tu definición aquí...';
+                        
+                        // Add auto-resize logic and validation on input
+                        textarea.addEventListener('input', (event) => {
+                            // Auto-resize
+                            event.target.style.height = 'auto';
+                            event.target.style.height = (event.target.scrollHeight) + 'px';
+
+                            // To uppercase and validation
+                            event.target.value = event.target.value.toUpperCase();
+                            if (event.target.value.trim() !== '') {
+                                event.target.classList.remove('border-red-500');
+                            }
+                        });
+
+                        // Add required attribute
+                        textarea.required = true;
+                        questionBlock.appendChild(textarea);
+
+                        // Options section
+                        const selectionTitle = document.createElement('p');
+                        selectionTitle.className = 'block text-sm font-medium text-gray-700 mt-4 mb-2';
+                        selectionTitle.textContent = 'O selecciona la opción correcta:';
+                        questionBlock.appendChild(selectionTitle);
+
+                        const optionsDiv = document.createElement('div');
+                        optionsDiv.className = 'space-y-2';
+                        q.options.forEach(option => {
+                            const label = document.createElement('label');
+                            label.className = 'flex items-center space-x-2 cursor-pointer';
+
+                            const input = document.createElement('input');
+                            input.type = 'radio';
+                            input.name = `question-${q.id}`;
+                            input.value = option;
+                            input.required = (q.type === 'Verdadero o Falso' || q.id === 2);
+                            input.className = 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300';
+                            input.addEventListener('change', (e) => {
+                                const relatedTextarea = document.getElementById(`question-${q.id}-definition`);
+                                if (relatedTextarea) {
+                                    relatedTextarea.value = e.target.value;
+                                    relatedTextarea.dispatchEvent(new Event('input')); // Trigger validation and resize
+                                }
+                            });
+
+                            label.appendChild(input);
+                            label.appendChild(document.createTextNode(option));
+                            optionsDiv.appendChild(label);
+                        });
+                        questionBlock.appendChild(optionsDiv);
+                    }
+                    
+                    // Append feedback element
+                    const feedbackDiv = document.createElement('div');
+                    feedbackDiv.className = 'feedback mt-2';
+                    questionBlock.appendChild(feedbackDiv);
+                    
+                    questionsContainer.appendChild(questionBlock);
+                });
+            }
+            
+            // Drag and Drop Logic
+            let draggedItem = null;
+
+            function dragStart(e) {
+                draggedItem = e.target;
+                e.dataTransfer.setData('text/plain', e.target.textContent);
+                setTimeout(() => {
+                    e.target.classList.add('opacity-50');
+                }, 0);
+            }
+
+            function dragEnter(e) {
+                e.preventDefault();
+                if (e.target.classList.contains('dropzone') && e.target.children.length === 0) {
+                    e.target.classList.add('drag-over');
+                }
+            }
+
+            function dragLeave(e) {
+                if (e.target.classList.contains('dropzone')) {
+                    e.target.classList.remove('drag-over');
+                }
+            }
+
+            function dragOver(e) {
+                e.preventDefault();
+                if (e.target.classList.contains('dropzone') && e.target.children.length === 0) {
+                    e.target.classList.add('drag-over');
+                }
+            }
+
+            function drop(e) {
+                e.preventDefault();
+                const dropzone = e.target.closest('.dropzone');
+                if (draggedItem && dropzone && dropzone.children.length === 0) {
+                    dropzone.classList.remove('drag-over');
+                    dropzone.classList.add('dropzone-occupied');
+                    draggedItem.classList.remove('opacity-50');
+                    dropzone.appendChild(draggedItem);
+                }
+                draggedItem = null;
+            }
+
+
+            // --- Evaluation Logic ---
+            function evaluateAnswers() {
+                score = 0;
+                attemptCount++;
+
+                showLoading(true);
+
+                // Simulate a delay for processing
+                setTimeout(() => {
+                    const questionBlocks = questionsContainer.querySelectorAll('.question-block');
+                    let allQuestionsAnswered = true;
+
+                    questions.forEach(q => {
+                        const questionBlock = document.querySelector(`[data-question-id="${q.id}"]`);
+                        let isCorrect = false;
+
+                        // Clear previous feedback
+                        const feedbackDiv = questionBlock.querySelector('.feedback');
+                        feedbackDiv.textContent = '';
+                        questionBlock.classList.remove('border-red-500');
+
+                        // Disable inputs after evaluation
+                        questionBlock.querySelectorAll('input, textarea').forEach(input => {
+                            input.disabled = true;
+                        });
+
+                        if (q.type === 'Opción Múltiple (única respuesta)' || q.type === 'Verdadero o Falso') {
+                            const selectedOption = questionBlock.querySelector(`input[name="question-${q.id}"]:checked`);
+                            if (selectedOption && selectedOption.value === q.correctAnswer) {
+                                isCorrect = true;
+                            } else if (!selectedOption) {
+                                allQuestionsAnswered = false;
+                            }
+                            if (isCorrect) {
+                                score++;
+                            }
+                            if (attemptCount > 1) { // Show feedback only after the first attempt
+                                if (isCorrect) {
+                                    feedbackDiv.innerHTML = '<span class="feedback correct">¡Respuesta Correcta!</span>';
+                                } else if (allQuestionsAnswered) {
+                                    feedbackDiv.innerHTML = `<span class="feedback incorrect">Respuesta Incorrecta. La respuesta correcta era: ${getCorrectAnswerText(q)}</span>`;
+                                    questionBlock.classList.add('border-red-500');
+                                }
+                            }
+                        } else if (q.type === 'Opción Múltiple (múltiples respuestas)') {
+                            const selectedOptions = Array.from(questionBlock.querySelectorAll(`input[name="question-${q.id}"]:checked`)).map(input => input.value);
+                            const correctAnswers = q.correctAnswers;
+
+                            // Check for question 7 specifically
+                            if (q.id === 7 && selectedOptions.length !== 6) {
+                                isCorrect = false;
+                                allQuestionsAnswered = false;
+                            } else {
+                                isCorrect = selectedOptions.length === correctAnswers.length &&
+                                            selectedOptions.every(option => correctAnswers.includes(option));
+                            }
+                            
+                            if (selectedOptions.length === 0) {
+                                allQuestionsAnswered = false;
+                            }
+
+                            if (isCorrect) {
+                                score++;
+                            }
+
+                            if (attemptCount > 1) { // Show feedback only after the first attempt
+                                if (isCorrect) {
+                                    feedbackDiv.innerHTML = '<span class="feedback correct">¡Respuesta Correcta!</span>';
+                                } else if (allQuestionsAnswered) {
+                                    feedbackDiv.innerHTML = `<span class="feedback incorrect">Respuesta Incorrecta. La respuesta correcta era: ${getCorrectAnswerText(q)}</span>`;
+                                    questionBlock.classList.add('border-red-500');
+                                }
+                            }
+                        } else if (q.type === 'Arrastrar y Soltar') {
+                            const dropzones = questionBlock.querySelectorAll('.dropzone');
+                            let correctMatches = 0;
+                            let unanswered = false;
+                            dropzones.forEach(dropzone => {
+                                const draggedElement = dropzone.querySelector('.draggable');
+                                if (draggedElement) {
+                                    const userAnswer = draggedElement.textContent;
+                                    const correctAnswer = dropzone.getAttribute('data-correct-answer');
+                                    if (userAnswer === correctAnswer) {
+                                        correctMatches++;
+                                    }
+                                } else {
+                                    unanswered = true;
+                                }
+                            });
+                            isCorrect = correctMatches === Object.keys(q.dropzones).length;
+                            if (unanswered) {
+                                allQuestionsAnswered = false;
+                            }
+                            if (isCorrect) {
+                                score++;
+                            }
+                            if (attemptCount > 1) { // Show feedback only after the first attempt
+                                if (isCorrect) {
+                                    feedbackDiv.innerHTML = '<span class="feedback correct">¡Respuesta Correcta!</span>';
+                                } else if (allQuestionsAnswered) {
+                                    feedbackDiv.innerHTML = `<span class="feedback incorrect">Respuesta Incorrecta. La respuesta correcta era: ${getCorrectAnswerText(q)}</span>`;
+                                    questionBlock.classList.add('border-red-500');
+                                }
+                            }
+                        } else if (q.type === 'Completar') {
+                            const inputField = questionBlock.querySelector(`#question-${q.id}-fill`);
+                            if (inputField) {
+                                const userAnswer = inputField.value.trim().toUpperCase();
+                                const correctAnswer = q.correctAnswer.trim().toUpperCase();
+                                isCorrect = userAnswer === correctAnswer;
+                            } else {
+                                allQuestionsAnswered = false;
+                            }
+                            if (isCorrect) {
+                                score++;
+                            }
+                            if (attemptCount > 1) { // Show feedback only after the first attempt
+                                if (isCorrect) {
+                                    feedbackDiv.innerHTML = '<span class="feedback correct">¡Respuesta Correcta!</span>';
+                                } else if (allQuestionsAnswered) {
+                                    feedbackDiv.innerHTML = `<span class="feedback incorrect">Respuesta Incorrecta. La respuesta correcta era: ${getCorrectAnswerText(q)}</span>`;
+                                    questionBlock.classList.add('border-red-500');
+                                }
+                            }
+                        } else if (q.type === 'Definición y Opción Múltiple') {
+                            const selectedOption = questionBlock.querySelector(`input[name="question-${q.id}"]:checked`);
+                            if (selectedOption && selectedOption.value === q.correctAnswer) {
+                                isCorrect = true;
+                            } else if (!selectedOption) {
+                                allQuestionsAnswered = false;
+                            }
+                            if (isCorrect) {
+                                score++;
+                            }
+                            if (attemptCount > 1) { // Show feedback only after the first attempt
+                                if (isCorrect) {
+                                    feedbackDiv.innerHTML = '<span class="feedback correct">¡Respuesta Correcta!</span>';
+                                } else if (allQuestionsAnswered) {
+                                    feedbackDiv.innerHTML = `<span class="feedback incorrect">Respuesta Incorrecta. La respuesta correcta era: ${getCorrectAnswerText(q)}</span>`;
+                                    questionBlock.classList.add('border-red-500');
+                                }
+                            }
+                        }
+                    });
+
+                    if (!allQuestionsAnswered) {
+                        showMessage('Error de Validación', 'Debes responder todas las preguntas para evaluar.');
+                        showLoading(false);
+                        return;
+                    }
+
+                    finalScoreSpan.textContent = score;
+                    totalQuestionsSpan.textContent = questions.length;
+                    scoreContainer.classList.remove('hidden');
+
+                    evaluateBtn.disabled = true;
+                    if (attemptCount === 1) {
+                        const isApproved = score >= 6;
+                        if (isApproved) {
+                            showMessage('¡Felicitaciones!', `Has aprobado la evaluación con un puntaje de ${score} de ${questions.length}.`);
+                            secondAttemptBtn.disabled = true;
+                        } else {
+                            showMessage('¡Ánimo!', `Tu puntaje es de ${score} de ${questions.length}. Puedes realizar un segundo intento para mejorar.`);
+                            secondAttemptBtn.disabled = false;
+                        }
+                    } else if (attemptCount > 1) {
+                        secondAttemptBtn.disabled = true;
+                    }
+                    downloadPdfBtn.disabled = false;
+                    showLoading(false);
+                }, 1500);
+            }
+            
+            function getCorrectAnswerText(q) {
+                if (q.correctAnswer) {
+                    return q.correctAnswer;
+                } else if (q.correctAnswers) {
+                    if (Array.isArray(q.correctAnswers)) {
+                        return q.correctAnswers.join(', ');
+                    } else {
+                        return Object.entries(q.correctAnswers).map(([def, val]) => `${def} -> ${val}`).join('; ');
+                    }
+                } else if (q.type === 'Arrastrar y Soltar') {
+                    return Object.entries(q.dropzones).map(([desc, item]) => `${desc} -> ${item}`).join('; ');
+                }
+                return '';
+            }
+
+            function handleSecondAttempt() {
+                if (attemptCount < 2) {
+                    // Re-enable all inputs and clear feedback
+                    const questionBlocks = questionsContainer.querySelectorAll('.question-block');
+                    questionBlocks.forEach(block => {
+                        block.classList.remove('border-red-500');
+                        const feedbackDiv = block.querySelector('.feedback');
+                        if (feedbackDiv) feedbackDiv.textContent = '';
+                        
+                        // Clear radio/checkbox selections
+                        block.querySelectorAll('input[type="radio"]:checked, input[type="checkbox"]:checked').forEach(input => {
+                            input.checked = false;
+                        });
+                        
+                        // Clear text inputs and textareas
+                        block.querySelectorAll('input[type="text"], textarea').forEach(input => {
+                            input.value = '';
+                            input.style.height = 'auto'; // Reset auto-resize
+                        });
+
+                        // Enable all inputs
+                        block.querySelectorAll('input, textarea').forEach(input => {
+                            input.disabled = false;
+                        });
+                        
+                        // Specific re-enabling for drag-and-drop
+                        const questionId = block.getAttribute('data-question-id');
+                        if (questionId === '4' || questionId === '5') {
+                            const dragContainer = block.querySelector('.drag-container');
+                            const dropzones = block.querySelectorAll('.dropzone');
+                            
+                            // Move dragged items back to the drag container
+                            dropzones.forEach(dropzone => {
+                                const draggedItem = dropzone.querySelector('.draggable');
+                                if (draggedItem) {
+                                    dragContainer.appendChild(draggedItem);
+                                }
+                                dropzone.classList.remove('dropzone-occupied');
+                            });
+                            dragContainer.querySelectorAll('.draggable').forEach(item => {
+                                item.style.transform = 'none';
+                                item.style.opacity = '1';
+                            });
+                        }
+                    });
+
+                    // Reset score and buttons
+                    score = 0;
+                    finalScoreSpan.textContent = 0;
+                    scoreContainer.classList.add('hidden');
+                    evaluateBtn.disabled = false;
+                    secondAttemptBtn.disabled = true;
+                    downloadPdfBtn.disabled = true;
+                }
+            }
+
+            // Function to check if a single answer is correct
+            function isAnswerCorrect(q) {
+                const questionBlock = document.querySelector(`[data-question-id="${q.id}"]`);
+                if (!questionBlock) return false;
+
+                if (q.type === 'Opción Múltiple (única respuesta)' || q.type === 'Verdadero o Falso') {
+                    const selectedOption = questionBlock.querySelector(`input[name="question-${q.id}"]:checked`);
+                    return selectedOption && selectedOption.value === q.correctAnswer;
+                } else if (q.type === 'Opción Múltiple (múltiples respuestas)') {
+                    const selectedOptions = Array.from(questionBlock.querySelectorAll(`input[name="question-${q.id}"]:checked`)).map(input => input.value);
+                    const correctAnswers = q.correctAnswers;
+                    return selectedOptions.length === correctAnswers.length &&
+                           selectedOptions.every(option => correctAnswers.includes(option));
+                } else if (q.type === 'Arrastrar y Soltar') {
+                    const dropzones = questionBlock.querySelectorAll('.dropzone');
+                    let correctMatches = 0;
+                    dropzones.forEach(dropzone => {
+                        const draggedElement = dropzone.querySelector('.draggable');
+                        if (draggedElement) {
+                            const userAnswer = draggedElement.textContent;
+                            const correctAnswer = dropzone.getAttribute('data-correct-answer');
+                            if (userAnswer === correctAnswer) {
+                                correctMatches++;
+                            }
+                        }
+                    });
+                    return correctMatches === Object.keys(q.dropzones).length;
+                } else if (q.type === 'Completar') {
+                    const inputField = questionBlock.querySelector(`#question-${q.id}-fill`);
+                    return inputField && inputField.value.trim().toUpperCase() === q.correctAnswer.trim().toUpperCase();
+                } else if (q.type === 'Definición y Opción Múltiple') {
+                    const selectedOption = questionBlock.querySelector(`input[name="question-${q.id}"]:checked`);
+                    return selectedOption && selectedOption.value === q.correctAnswer;
+                }
+                return false;
+            }
+
+            async function downloadPdf() {
+                showLoading(true);
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                const margin = 15;
+                const pageHeight = doc.internal.pageSize.height;
+                let y = margin;
+                const lineHeight = 5;
+                const innerMargin = 3;
+                const finalScore = parseInt(finalScoreSpan.textContent, 10);
+                const totalQuestions = parseInt(totalQuestionsSpan.textContent, 10);
+                
+                // Lógica de aprobación actualizada: 6 o más es aprobación, 5 o menos es ánimo.
+                const isApproved = finalScore >= 6;
+
+                // Function to check for page break
+                const checkPageBreak = (requiredSpace) => {
+                    if (y + requiredSpace > pageHeight - margin) {
+                        doc.addPage();
+                        y = margin;
+                    }
+                };
+
+                // Add aesthetic header
+                const headerColor = '#1e40af'; // Tailwind blue-800
+                doc.setFillColor(headerColor);
+                doc.rect(0, 0, doc.internal.pageSize.width, 30, 'F');
+                doc.setTextColor(255, 255, 255); // White text
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(22);
+                doc.text('EVALUACIÓN SENATIC', doc.internal.pageSize.width / 2, 15, { align: 'center' });
+                doc.setFontSize(14);
+                doc.text('TÉCNICO EN SISTEMAS TELEINFORMÁTICOS', doc.internal.pageSize.width / 2, 23, { align: 'center' });
+                y = 40;
+                doc.setTextColor(0, 0, 0); // Black text
+                doc.setFont('helvetica', 'normal');
+
+                // Add header info with new styling
+                doc.setFontSize(10);
+                const headerFields = [
+                    { label: 'COMPETENCIA:', id: 'competencia' },
+                    { label: 'RAP:', id: 'rap' },
+                    { label: 'TEMA A EVALUAR:', id: 'temaEvaluar' },
+                    { label: 'TIPO DE INSTRUMENTO:', id: 'tipoInstrumento' },
+                    { label: 'FICHA:', id: 'ficha' },
+                    { label: 'FECHA:', id: 'fecha' },
+                    { label: 'NOMBRE DEL APRENDIZ:', id: 'nombreAprendiz' },
+                    { label: 'NOMBRE DEL INSTRUCTOR:', id: 'nombreInstructor' }
+                ];
+                
+                const fieldBgColor = '#e0f2fe'; // Tailwind blue-100
+                const borderRadius = 2; // Borde redondeado
+
+                headerFields.forEach(field => {
+                    const labelText = field.label;
+                    const valueText = document.getElementById(field.id).value;
+                    
+                    const labelLines = doc.splitTextToSize(labelText, doc.internal.pageSize.width - margin * 2 - 10);
+                    const valueLines = doc.splitTextToSize(valueText, doc.internal.pageSize.width - margin * 2 - 10);
+                    
+                    const requiredSpace = (labelLines.length + valueLines.length) * lineHeight + innerMargin * 2;
+                    checkPageBreak(requiredSpace);
+                    
+                    // Dibuja el rectángulo con fondo azul claro y esquinas redondeadas
+                    doc.setFillColor(fieldBgColor);
+                    doc.roundedRect(margin, y - 1.5, doc.internal.pageSize.width - margin * 2, requiredSpace, borderRadius, borderRadius, 'F');
+                    
+                    // Dibuja el label en negrita
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(10);
+                    doc.text(labelLines, margin + innerMargin, y + innerMargin);
+                    
+                    y += labelLines.length * lineHeight;
+                    
+                    // Dibuja el valor del campo en tamaño normal
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(10);
+                    doc.text(valueLines, margin + innerMargin, y + innerMargin);
+                    
+                    y += valueLines.length * lineHeight + 2;
+                });
+                
+                y += 5;
+
+                // Add aesthetic separator line
+                doc.setDrawColor('#9ca3af'); // Tailwind gray-400
+                doc.setLineWidth(0.5);
+                doc.line(margin, y, doc.internal.pageSize.width - margin, y);
+                y += 7;
+
+                // Add questions and answers with styling
+                doc.setFontSize(11);
+                questions.forEach(q => {
+                    const questionText = `${q.id}. ${q.question}`;
+                    const questionLines = doc.splitTextToSize(questionText, doc.internal.pageSize.width - margin * 2);
+                    
+                    const userAnswerText = `Tu Respuesta: ${getUserAnswerForPdf(q)}`;
+                    const userAnswerLines = doc.splitTextToSize(userAnswerText, doc.internal.pageSize.width - margin * 2);
+
+                    const isCorrect = isAnswerCorrect(q);
+                    let feedbackText = isCorrect ? 'Respuesta correcta' : 'Respuesta incorrecta';
+                    let feedbackColor = isCorrect ? '#10b981' : '#ef4444';
+
+                    const requiredSpace = (questionLines.length + userAnswerLines.length) * lineHeight + 10;
+                    checkPageBreak(requiredSpace);
+                    
+                    // Question text
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(questionLines, margin, y);
+                    y += questionLines.length * lineHeight;
+                    y += 3;
+
+                    // User's response
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(29, 78, 216); // Tailwind blue-700
+                    doc.text(userAnswerLines, margin + 5, y);
+                    y += userAnswerLines.length * lineHeight;
+                    y += 3; // Space between user answer and feedback
+
+                    // Feedback
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(feedbackColor);
+                    const feedbackLines = doc.splitTextToSize(feedbackText, doc.internal.pageSize.width - margin * 2);
+                    doc.text(feedbackLines, margin + 5, y);
+                    y += feedbackLines.length * lineHeight;
+                    
+                    // If incorrect, add the correct answer
+                    if (!isCorrect) {
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor('#10b981'); // Tailwind green-500
+                        const correctAnswerLines = doc.splitTextToSize(`Respuesta Correcta: ${getCorrectAnswerText(q)}`, doc.internal.pageSize.width - margin * 2 - 5);
+                        doc.text(correctAnswerLines, margin + 5, y);
+                        y += correctAnswerLines.length * lineHeight;
+                    }
+
+                    // Reset colors and add a separator line
+                    doc.setTextColor(0, 0, 0);
+                    y += 5;
+                    doc.setDrawColor('#d1d5db'); // Tailwind gray-300
+                    doc.line(margin, y, doc.internal.pageSize.width - margin, y);
+                    y += 7;
+                });
+                
+                // Add final score at the end with the new styling
+                checkPageBreak(30);
+                
+                const scoreBoxWidth = 80;
+                const scoreBoxHeight = 15;
+                const scoreBoxX = (doc.internal.pageSize.width - scoreBoxWidth) / 2;
+                const scoreBoxY = y + 10; // Add some space
+
+                doc.setFillColor('#fef08a'); // Tailwind yellow-200
+                doc.setDrawColor('#fbbf24'); // Tailwind yellow-400
+                doc.roundedRect(scoreBoxX, scoreBoxY, scoreBoxWidth, scoreBoxHeight, 3, 3, 'FD');
+
+                const finalScoreText = `Puntaje Final: ${finalScore} / ${totalQuestions}`;
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 0, 0);
+                doc.text(finalScoreText, doc.internal.pageSize.width / 2, scoreBoxY + scoreBoxHeight / 2 + 1, { align: 'center' });
+                
+                y = scoreBoxY + scoreBoxHeight + 5; // Move cursor down below score box
+                
+                // Add conditional message
+                let message;
+                let messageColor;
+
+                if (finalScore >= 6) {
+                    message = '¡Felicitaciones! Has aprobado la evaluación.';
+                    messageColor = '#10b981'; // Tailwind green-500
+                } else {
+                    message = '¡Ánimo! Puedes volver a intentarlo y mejorar tu puntaje.';
+                    messageColor = '#ef4444'; // Tailwind red-500
+                }
+                
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(messageColor);
+                doc.text(message, doc.internal.pageSize.width / 2, y, { align: 'center' });
+
+                // Add signature line for the instructor
+                y += 20; // Add some extra space after the final message
+                checkPageBreak(25); // Ensure there's enough space for the signature line
+                
+                const signatureText = 'Firma del instructor';
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                doc.setTextColor(0, 0, 0);
+                doc.text(signatureText, margin, y);
+                
+                y += 10; // Position the line below the text
+                
+                doc.setDrawColor(0, 0, 0); // Black line
+                doc.line(margin, y, margin + 80, y); // Draw a line 80mm long
+                
+                // Save PDF
+                doc.save(`Evaluacion_SENATIC_${document.getElementById('nombreAprendiz').value}.pdf`);
+                showLoading(false);
+            }
+            
+            function getUserAnswerForPdf(q) {
+                const questionBlock = document.querySelector(`[data-question-id="${q.id}"]`);
+                if (!questionBlock) return "N/A";
+
+                if (q.type === 'Definición y Opción Múltiple' || q.type === 'Opción Múltiple (única respuesta)' || q.type === 'Verdadero o Falso') {
+                    const selected = questionBlock.querySelector(`input[name="question-${q.id}"]:checked`);
+                    return selected ? selected.value : 'Sin responder';
+                } else if (q.type === 'Opción Múltiple (múltiples respuestas)') {
+                    const selectedOptions = Array.from(questionBlock.querySelectorAll(`input[name="question-${q.id}"]:checked`)).map(input => input.value);
+                    return selectedOptions.join(', ') || 'Sin responder';
+                } else if (q.type === 'Arrastrar y Soltar') {
+                    const answers = {};
+                    const dropzones = questionBlock.querySelectorAll('.dropzone');
+                    dropzones.forEach(dropzone => {
+                        const draggedItem = dropzone.querySelector('.draggable');
+                        const definition = dropzone.previousElementSibling.textContent.trim();
+                        answers[definition] = draggedItem ? draggedItem.textContent : 'Sin responder';
+                    });
+                    return Object.entries(answers).map(([def, ans]) => `"${def}" -> "${ans}"`).join('; ');
+                } else if (q.type === 'Completar') {
+                    const inputField = questionBlock.querySelector(`#question-${q.id}-fill`);
+                    return inputField.value || 'Sin responder';
+                }
+                return 'N/A';
+            }
+            
+            function getCorrectAnswerText(q) {
+                if (q.correctAnswer) {
+                    return q.correctAnswer;
+                } else if (q.correctAnswers) {
+                    if (Array.isArray(q.correctAnswers)) {
+                        return q.correctAnswers.join(', ');
+                    } else {
+                        return Object.entries(q.correctAnswers).map(([def, val]) => `"${def}" -> "${val}"`).join('; ');
+                    }
+                } else if (q.type === 'Arrastrar y Soltar') {
+                    return Object.entries(q.dropzones).map(([desc, item]) => `"${desc}" -> "${item}"`).join('; ');
+                }
+                return 'N/A';
+            }
+
+            // --- Main Event Handlers ---
+            evaluateBtn.addEventListener('click', () => {
+                const form = document.getElementById('evaluationForm');
+                const headerFields = document.querySelectorAll('.header-field input, .header-field select, .header-field textarea');
+
+                // Basic header validation
+                let headerIsValid = true;
+                headerFields.forEach(field => {
+                    if (!field.value.trim()) {
+                        field.classList.add('border-red-500');
+                        headerIsValid = false;
+                    } else {
+                        field.classList.remove('border-red-500');
+                    }
+                });
+
+                if (!headerIsValid) {
+                    showMessage('Campos Incompletos', 'Por favor, complete todos los campos del encabezado antes de evaluar.');
+                    return;
+                }
+
+                // Basic question validation
+                let allQuestionsAnswered = true;
+                questions.forEach(q => {
+                    const questionBlock = document.querySelector(`[data-question-id="${q.id}"]`);
+                    if (q.type === 'Definición y Opción Múltiple') {
+                        const textarea = questionBlock.querySelector('textarea');
+                        const radio = questionBlock.querySelector('input[type="radio"]:checked');
+                        if (!textarea.value.trim() || !radio) {
+                            allQuestionsAnswered = false;
+                            if (!textarea.value.trim()) textarea.classList.add('border-red-500');
+                            if (!radio) questionBlock.classList.add('border-red-500');
+                        }
+                    } else if (q.type.includes('Opción Múltiple')) {
+                        const checkedInputs = questionBlock.querySelectorAll('input[type="radio"]:checked, input[type="checkbox"]:checked');
+                        
+                        // New validation for question 7
+                        if (q.id === 7 && checkedInputs.length !== 6) {
+                            allQuestionsAnswered = false;
+                            questionBlock.classList.add('border-red-500');
+                            showMessage('Preguntas Incompletas', 'Para la pregunta 7, debes seleccionar exactamente 6 opciones.');
+                            return; // Stop further validation
+                        } else if (checkedInputs.length === 0 && q.id !== 7) {
+                            allQuestionsAnswered = false;
+                            questionBlock.classList.add('border-red-500');
+                        }
+                    } else if (q.type === 'Arrastrar y Soltar') {
+                        const dropzones = questionBlock.querySelectorAll('.dropzone');
+                        let allMatched = true;
+                        dropzones.forEach(dropzone => {
+                            if (dropzone.children.length === 0) {
+                                allMatched = false;
+                                dropzone.classList.add('border-red-500');
+                            }
+                        });
+                        if (!allMatched) {
+                            allQuestionsAnswered = false;
+                        }
+                    } else if (q.type === 'Completar') {
+                        const input = questionBlock.querySelector('input[type="text"]');
+                        if (!input.value.trim()) {
+                            allQuestionsAnswered = false;
+                            input.classList.add('border-red-500');
+                        }
+                    }
+                });
+
+                if (!allQuestionsAnswered) {
+                    showMessage('Preguntas Incompletas', 'Por favor, responda todas las preguntas para evaluar.');
+                    return;
+                }
+                
+                evaluateAnswers();
+            });
+
+            secondAttemptBtn.addEventListener('click', handleSecondAttempt);
+            downloadPdfBtn.addEventListener('click', downloadPdf);
+
+            // Initial render
+            renderQuestions();
+            checkFormValidity();
+        });
+    </script>
+</body>
+</html>
