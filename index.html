@@ -47,7 +47,7 @@
         .feedback.incorrect {
             color: #ef4444;
         }
-        
+
         /* Nuevos estilos para el textarea de definición */
         .definition-textarea {
             min-height: 100px;
@@ -79,7 +79,7 @@
             transition: transform 0.2s ease, box-shadow 0.2s ease;
             touch-action: none;
         }
-        
+
         .draggable:hover {
             box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
         }
@@ -153,10 +153,17 @@
 
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <!-- Header -->
-        <div class="text-center mb-8">
+        <div class="text-center mb-4">
             <h1 class="text-3xl font-bold text-blue-900 mb-2">EVALUACIÓN</h1>
             <h2 class="text-2xl font-semibold text-blue-800 mb-1">PROGRAMA SENATIC</h2>
             <h3 class="text-xl font-medium text-blue-700">TÉCNICO SISTEMAS TELEINFORMÁTICOS</h3>
+        </div>
+        
+        <!-- Timer Display -->
+        <div class="flex justify-center mb-6">
+            <div id="timerDisplay" class="text-center text-4xl font-extrabold text-blue-600 bg-white p-4 rounded-xl shadow-lg border-2 border-blue-200 w-full max-w-xs">
+                30:00
+            </div>
         </div>
 
         <!-- Header Fields -->
@@ -271,6 +278,8 @@
             const closeMessageBtn = document.getElementById('closeMessage');
             const loadingOverlay = document.getElementById('loadingOverlay');
             const fechaInput = document.getElementById('fecha');
+            const timerDisplay = document.getElementById('timerDisplay');
+            const headerFields = document.querySelectorAll('.header-field input, .header-field select, .header-field textarea');
 
             // Set today's date as default
             const today = new Date();
@@ -278,8 +287,8 @@
             const month = String(today.getMonth() + 1).padStart(2, '0');
             const day = String(today.getDate()).padStart(2, '0');
             fechaInput.value = `${year}-${month}-${day}`;
-
-            // Questions Data - Questions 9-12 have been removed as requested.
+            
+            // Questions Data
             const questions = [
                 {
                     "id": 1,
@@ -401,6 +410,13 @@
             // State variables
             let attemptCount = 0;
             let score = 0;
+            let timer;
+            let timeLeft;
+            const timerDurations = [30 * 60, 5 * 60]; // 30 mins and 5 mins in seconds
+            let currentAttempt = 0; // 0 for first, 1 for second
+
+            // New variable to control the unload warning
+            let warnOnUnload = false;
 
             // Helper Functions
             function showMessage(title, message) {
@@ -435,7 +451,6 @@
             }
 
             // Validación en tiempo real para campos obligatorios del encabezado
-            const headerFields = document.querySelectorAll('.header-field input, .header-field select, .header-field textarea');
             headerFields.forEach(field => {
                 field.addEventListener('input', () => {
                     if (field.value.trim() !== '') {
@@ -443,7 +458,7 @@
                     }
                     checkFormValidity();
                 });
-                
+
                 // Para campos que deben ser en mayúsculas
                 if (field.id === 'rap' || field.id === 'nombreAprendiz' || field.id === 'nombreInstructor' || field.id === 'temaEvaluar') {
                     field.addEventListener('input', (event) => {
@@ -460,9 +475,68 @@
                         allFilled = false;
                     }
                 });
-                evaluateBtn.disabled = !allFilled;
+                // Only enable the evaluate button if the timer is not finished and header is valid
+                if (timeLeft > 0 && currentAttempt < 2) { // Allow evaluation during both attempts
+                    evaluateBtn.disabled = !allFilled;
+                } else {
+                    evaluateBtn.disabled = true;
+                }
             }
 
+            // --- Lógica de advertencia de recarga del navegador (beforeunload) ---
+            const handleBeforeUnload = (event) => {
+                if (warnOnUnload) {
+                    event.preventDefault();
+                    // Chrome requiere el `returnValue` para mostrar la advertencia
+                    event.returnValue = 'La evaluación aún no ha terminado. ¿Estás seguro de que quieres salir?';
+                    return 'La evaluación aún no ha terminado. ¿Estás seguro de que quieres salir?';
+                }
+            };
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            
+            // Timer Functions
+            function startTimer(duration) {
+                // Activar la advertencia de recarga al iniciar el temporizador
+                warnOnUnload = true;
+
+                clearInterval(timer);
+                timeLeft = duration;
+                updateTimerDisplay();
+
+                timer = setInterval(() => {
+                    timeLeft--;
+                    updateTimerDisplay();
+
+                    if (timeLeft <= 0) {
+                        clearInterval(timer);
+                        handleTimerEnd();
+                    }
+                }, 1000);
+            }
+
+            function updateTimerDisplay() {
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+            
+            function handleTimerEnd() {
+                // Desactivar la advertencia al terminar el tiempo
+                warnOnUnload = false;
+
+                // Disable all inputs
+                questionsContainer.querySelectorAll('input, textarea, select, button').forEach(el => el.disabled = true);
+                evaluateBtn.disabled = true;
+
+                if (currentAttempt === 0) {
+                    secondAttemptBtn.disabled = false;
+                    showMessage('¡Tiempo Agotado!', 'El tiempo para el primer intento ha terminado. Puedes realizar un segundo intento.');
+                } else {
+                    // En el segundo intento, si el tiempo se agota, se evalúa y se habilita la descarga.
+                    evaluateAnswers(); // Auto-evaluate on second attempt timeout
+                }
+            }
+            
             // Render Questions
             function renderQuestions() {
                 questionsContainer.innerHTML = '';
@@ -500,7 +574,7 @@
                             input.name = `question-${q.id}`;
                             input.value = option;
                             input.className = 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300';
-                            input.required = true; // All radio buttons in a group are required
+                            input.required = true;
 
                             label.appendChild(input);
                             label.appendChild(document.createTextNode(option));
@@ -705,8 +779,12 @@
 
             // --- Evaluation Logic ---
             function evaluateAnswers() {
+                // Desactivar la advertencia al evaluar
+                warnOnUnload = false;
+                
                 score = 0;
                 attemptCount++;
+                clearInterval(timer); // Stop the timer
 
                 showLoading(true);
 
@@ -725,7 +803,7 @@
                         questionBlock.classList.remove('border-red-500');
 
                         // Disable inputs after evaluation
-                        questionBlock.querySelectorAll('input, textarea').forEach(input => {
+                        questionBlock.querySelectorAll('input, textarea, select').forEach(input => {
                             input.disabled = true;
                         });
 
@@ -848,6 +926,11 @@
                         }
                     });
 
+                    // Si se está en el segundo intento y el tiempo se agotó, se califica sin importar si todo está respondido.
+                    if (currentAttempt === 1 && timeLeft <= 0) {
+                        allQuestionsAnswered = true;
+                    }
+                    
                     if (!allQuestionsAnswered) {
                         showMessage('Error de Validación', 'Debes responder todas las preguntas para evaluar.');
                         showLoading(false);
@@ -859,19 +942,30 @@
                     scoreContainer.classList.remove('hidden');
 
                     evaluateBtn.disabled = true;
+                    
+                    // --- Lógica para activar/desactivar el botón PDF ---
                     if (attemptCount === 1) {
                         const isApproved = score >= 6;
                         if (isApproved) {
                             showMessage('¡Felicitaciones!', `Has aprobado la evaluación con un puntaje de ${score} de ${questions.length}.`);
                             secondAttemptBtn.disabled = true;
+                            downloadPdfBtn.disabled = false; // Activa el botón PDF si aprueba en el primer intento
                         } else {
                             showMessage('¡Ánimo!', `Tu puntaje es de ${score} de ${questions.length}. Puedes realizar un segundo intento para mejorar.`);
                             secondAttemptBtn.disabled = false;
+                            downloadPdfBtn.disabled = true; // Desactiva el botón PDF si reprueba en el primer intento
                         }
                     } else if (attemptCount > 1) {
+                        const isApproved = score >= 6;
                         secondAttemptBtn.disabled = true;
+                        evaluateBtn.disabled = true;
+                        downloadPdfBtn.disabled = false; // El botón de PDF se activa siempre después del segundo intento.
+                        if (isApproved) {
+                             showMessage('¡Felicidades!', `Has aprobado la evaluación en el segundo intento con un puntaje de ${score} de ${questions.length}.`);
+                        } else {
+                            showMessage('¡Lo sentimos!', `Has reprobado la evaluación en el segundo intento con un puntaje de ${score} de ${questions.length}. Por favor, contacta a tu instructor.`);
+                        }
                     }
-                    downloadPdfBtn.disabled = false;
                     showLoading(false);
                 }, 1500);
             }
@@ -893,6 +987,12 @@
 
             function handleSecondAttempt() {
                 if (attemptCount < 2) {
+                    // Activar la advertencia para el segundo intento
+                    warnOnUnload = true;
+
+                    // Reset attempt count to 0 and start the second attempt
+                    currentAttempt = 1;
+
                     // Re-enable all inputs and clear feedback
                     const questionBlocks = questionsContainer.querySelectorAll('.question-block');
                     questionBlocks.forEach(block => {
@@ -941,9 +1041,12 @@
                     score = 0;
                     finalScoreSpan.textContent = 0;
                     scoreContainer.classList.add('hidden');
-                    evaluateBtn.disabled = false;
+                    evaluateBtn.disabled = false; // El botón de evaluar se activa para el segundo intento
                     secondAttemptBtn.disabled = true;
                     downloadPdfBtn.disabled = true;
+                    
+                    // Start the second timer
+                    startTimer(timerDurations[currentAttempt]);
                 }
             }
 
@@ -985,6 +1088,9 @@
             }
 
             async function downloadPdf() {
+                // Desactivar la advertencia al descargar el PDF
+                warnOnUnload = false;
+
                 showLoading(true);
 
                 const { jsPDF } = window.jspdf;
@@ -1184,6 +1290,9 @@
                 // Save PDF
                 doc.save(`Evaluacion_SENATIC_${document.getElementById('nombreAprendiz').value}.pdf`);
                 showLoading(false);
+                
+                // NEW: Disable the button after downloading
+                downloadPdfBtn.disabled = true;
             }
             
             function getUserAnswerForPdf(q) {
@@ -1230,8 +1339,7 @@
             // --- Main Event Handlers ---
             evaluateBtn.addEventListener('click', () => {
                 const form = document.getElementById('evaluationForm');
-                const headerFields = document.querySelectorAll('.header-field input, .header-field select, .header-field textarea');
-
+                
                 // Basic header validation
                 let headerIsValid = true;
                 headerFields.forEach(field => {
@@ -1308,6 +1416,7 @@
             // Initial render
             renderQuestions();
             checkFormValidity();
+            startTimer(timerDurations[currentAttempt]); // Start the first timer
         });
     </script>
 </body>
